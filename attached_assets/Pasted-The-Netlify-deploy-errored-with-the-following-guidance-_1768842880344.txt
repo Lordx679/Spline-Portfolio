@@ -1,0 +1,138 @@
+The Netlify deploy errored, with the following guidance provided:
+
+**Diagnosis**
+
+- Relevant log lines:
+  - build command executed: [line 61](#L61)
+  - vite starting: [line 62](#L62)
+  - Build failed: [line 66](#L66)
+  - Rollup failed to resolve import "@/components/ui/toaster" from App.tsx: [line 68](#L68)
+  - Vite suggesting to add the module to rollupOptions.external: [line 70](#L70)
+  - command failed: [line 84](#L84)
+
+- Error type: Vite / Rollup "failed to resolve import" (unresolved import).
+- Probable cause: The import "@/components/ui/toaster" in client/src/App.tsx can't be resolved during build. This is usually because either:
+  1. The file path doesn't exist or wasn't committed (missing/misnamed file or wrong case), or
+  2. The "@" path alias (used to mean client/src) is not configured for Vite (or configured incorrectly), so Rollup can't map "@" to the real folder.
+
+You can inspect the importing file here: https://github.com/Lordx679/Spline-Portfolio/blob/main/client/src/App.tsx
+
+**Solution**
+
+1) Verify the file is present and the import path is correct
+   - Confirm the target file exists in the repo at one of these locations (case-sensitive):
+     - client/src/components/ui/toaster.tsx
+     - client/src/components/ui/toaster.ts
+     - client/src/components/ui/toaster.jsx
+     - client/src/components/ui/toaster.js
+   - If the file is missing, add/commit it to the repository. If the filename uses different casing (e.g. Toaster.tsx), update the import in App.tsx to match exactly.
+   - If the import should be a package instead of a local file, verify the package is listed in package.json (and installed) before trying to externalize it.
+
+2) If the file exists but the import still fails, configure the Vite alias so "@" resolves to client/src
+   - Edit (or create) client/vite.config.ts (or client/vite.config.js) and add a resolve.alias mapping. Example TypeScript config to add or merge into your existing config:
+
+```ts
+// client/vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
+});
+```
+
+   - If you use JavaScript, the same change applies in vite.config.js (use require and __dirname accordingly).
+   - If you use TypeScript path mapping (tsconfig.json), also ensure tsconfig has:
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}
+```
+   - After making these changes, commit them and trigger a Netlify build again.
+
+3) Why not add the module to rollupOptions.external?
+   - Vite suggested adding the import to build.rollupOptions.external, but that treats the import as an external dependency and won't bundle it — not what you want for a local component. Only use external if the import is an external runtime dependency and you intentionally do not want it bundled.
+   - If you ever consider that route, first verify the package is in package.json (or the file was committed), per the instructions above.
+
+Follow these steps (confirm file exists, fix import casing, add/update Vite alias, commit) and your build should resolve the "@/..." import and succeed.
+
+The relevant error logs are:
+
+Line 0: build-image version: efa9a2c8b92d443f700fd1ea32ecd88f75212cfc (noble-new-builds)
+Line 1: buildbot version: 8d0edf1d57efe8e54d6b6b12c54da32e6d71ab3b
+Line 2: Fetching cached dependencies
+Line 3: Failed to fetch cache, continuing with build
+Line 4: Starting to prepare the repo for build
+Line 5: No cached dependencies found. Cloning fresh repo
+Line 6: git clone --filter=blob:none https://github.com/Lordx679/Spline-Portfolio
+Line 7: Preparing Git Reference refs/heads/main
+Line 8: Starting to install dependencies
+Line 9: mise [36m~/.config/mise/config.toml[0m tools: [34mpython[0m@3.14.2
+Line 10: mise [36m~/.config/mise/config.toml[0m tools: [34mruby[0m@3.4.8
+Line 11: mise [36m~/.config/mise/config.toml[0m tools: [34mgo[0m@1.25.6
+Line 12: v22.22.0 is already installed.
+Line 13: Now using node v22.22.0 (npm v10.9.4)
+Line 54: [36m[1m​[22m[39m
+Line 55: [36m[1m❯ Loading extensions[22m[39m
+Line 56:    - neon
+Line 57: [96m[1m​[22m[39m
+Line 58: [96m[1mbuild.command from netlify.toml                               [22m[39m
+Line 59: [96m[1m────────────────────────────────────────────────────────────────[22m[39m
+Line 60: ​
+Line 61: [36m$ vite build client[39m
+Line 62: [36mvite v7.3.0 [32mbuilding client environment for production...[36m[39m
+Line 63: transforming...
+Line 64: Failed during stage 'building site': Build script returned non-zero exit code: 2
+Line 65: [32m✓[39m 4 modules transformed.
+Line 66: [31m✗[39m Build failed in 549ms
+Line 67: [31merror during build:
+Line 68: [31m[vite]: Rollup failed to resolve import "@/components/ui/toaster" from "/opt/build/repo/client/src/App.tsx".
+Line 69: This is most likely unintended because it can break your application at runtime.
+Line 70: If you do want to externalize this module explicitly add it to
+Line 71: `build.rollupOptions.external`[31m
+Line 72:     at viteLog (file:///opt/build/repo/node_modules/vite/dist/node/chunks/config.js:33634:57)
+Line 73:     at onRollupLog (file:///opt/build/repo/node_modules/vite/dist/node/chunks/config.js:33664:7)
+Line 74:     at onLog (file:///opt/build/repo/node_modules/vite/dist/node/chunks/config.js:33466:4)
+Line 75:     at file:///opt/build/repo/node_modules/rollup/dist/es/shared/node-entry.js:21004:32
+Line 76:     at Object.logger [as onLog] (file:///opt/build/repo/node_modules/rollup/dist/es/shared/node-entry.js:22891:9)
+Line 77:     at ModuleLoader.handleInvalidResolvedId (file:///opt/build/repo/node_modules/rollup/dist/es/shared/node-entry.js:21635:26)
+Line 78:     at file:///opt/build/repo/node_modules/rollup/dist/es/shared/node-entry.js:21593:26[39m
+Line 79: [91m[1m​[22m[39m
+Line 80: [91m[1m"build.command" failed                                        [22m[39m
+Line 81: [91m[1m────────────────────────────────────────────────────────────────[22m[39m
+Line 82: ​
+Line 83:   [31m[1mError message[22m[39m
+Line 84:   Command failed with exit code 1: vite build client
+Line 85: ​
+Line 86:   [31m[1mError location[22m[39m
+Line 87:   In build.command from netlify.toml:
+Line 88:   vite build client
+Line 89: ​
+Line 90:   [31m[1mResolved config[22m[39m
+Line 91:   build:
+Line 92:     command: vite build client
+Line 93:     commandOrigin: config
+Line 94:     environment:
+Line 95:       - DISCORD_TOKEN
+Line 96:       - DISCORD_USER_ID
+Line 97:     publish: /opt/build/repo/dist/public
+Line 98:     publishOrigin: config
+Line 99:   redirects:
+Line 100:     - from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+Line 101: Build failed due to a user error: Build script returned non-zero exit code: 2
+Line 102: Failing build: Failed to build site
+Line 103: Finished processing build request in 29.576s
