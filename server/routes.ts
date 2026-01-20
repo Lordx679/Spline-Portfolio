@@ -16,10 +16,13 @@ export async function registerRoutes(
     const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
     const DISCORD_USER_ID = process.env.DISCORD_USER_ID;
 
+    console.log(`[Discord API] Fetching profile for ID: ${DISCORD_USER_ID}`);
+    console.log(`[Discord API] Token present: ${!!DISCORD_TOKEN}`);
+
     if (!DISCORD_TOKEN || !DISCORD_USER_ID) {
-      // Fallback/Mock data if not configured yet
+      console.log("[Discord API] Missing credentials, returning fallback");
       return res.json({
-        id: "0",
+        id: "394912002843344898",
         username: "Lord",
         discriminator: "0",
         avatar: "https://cdn.discordapp.com/embed/avatars/0.png",
@@ -33,9 +36,16 @@ export async function registerRoutes(
       const response = await fetch(`https://discord.com/api/v10/users/${DISCORD_USER_ID}`, {
         headers: { Authorization: `Bot ${DISCORD_TOKEN}` },
       });
-      const data = await response.json();
       
-      // Map Discord API response to our schema if necessary
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Discord API] Discord returned error ${response.status}: ${errorText}`);
+        throw new Error(`Discord API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log(`[Discord API] Successfully fetched data for ${data.username}`);
+      
       res.json({
         id: data.id,
         username: data.username,
@@ -45,8 +55,9 @@ export async function registerRoutes(
         accent_color: data.accent_color,
         global_name: data.global_name,
       });
-    } catch (err) {
-      res.status(500).json({ message: "Failed to fetch Discord profile" });
+    } catch (err: any) {
+      console.error("[Discord API] Error:", err.message);
+      res.status(500).json({ message: "Failed to fetch Discord profile", error: err.message });
     }
   });
 
